@@ -16,6 +16,101 @@ import java.util.concurrent.*;
  *
  * IMPORTANT: If a scheduled task throws an unchecked exception, the scheduler silently
  * stops future executions of that task. Always catch and handle exceptions inside the task.
+ * 
+ * 
+ * 
+ * 
+ * CBS → Kafka → Consumer → Queue
+            ↓
+     Batch Scheduler (5 sec)
+            ↓
+     Reconciliation Engine
+            ↓
+     Bank API / PSP API
+            ↓
+     DB (status update)
+            ↓
+     Alert system (if mismatch)
+     
+     class Transaction {
+    String txnId;
+    double amount;
+    String status; // PENDING, MATCHED, MISMATCH
+    BlockingQueue<Transaction> queue = new LinkedBlockingQueue<>(1000);
+    ExecutorService producerPool = Executors.newFixedThreadPool(2);
+
+producerPool.submit(() -> {
+    for (int i = 1; i <= 50; i++) {
+        Transaction tx = new Transaction();
+        tx.txnId = "TXN-" + i;
+        tx.amount = Math.random() * 1000;
+        tx.status = "PENDING";
+
+        queue.offer(tx);
+        System.out.println("[PRODUCER] Added " + tx.txnId);
+
+        sleep(100);
+        
+        
+    }
+});
+
+
+ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+scheduler.scheduleWithFixedDelay(() -> {
+    List<Transaction> batch = new ArrayList<>();
+
+    queue.drainTo(batch, 10); // batch size = 10
+
+    if (batch.isEmpty()) return;
+
+    System.out.println("\n[BATCH] Processing " + batch.size() + " transactions");
+
+    processBatch(batch);
+
+}, 0, 5, TimeUnit.SECONDS)
+
+void processBatch(List<Transaction> batch) {
+
+    for (Transaction tx : batch) {
+        try {
+            boolean matched = callBankAPI(tx);
+
+            if (matched) {
+                tx.status = "MATCHED";
+            } else {
+                tx.status = "MISMATCH";
+            }
+
+            saveToDB(tx);
+
+        } catch (Exception e) {
+            System.err.println("[ERROR] " + tx.txnId + " failed: " + e.getMessage());
+        }
+    }
+}
+boolean callBankAPI(Transaction tx) {
+    // simulate network delay
+    sleep(50);
+
+    return Math.random() > 0.2; // 80% success
+}
+
+void saveToDB(Transaction tx) {
+    System.out.println("[DB] " + tx.txnId + " → " + tx.status);
+}
+}
+
+Producer → adds TXNs to queue
+        ↓
+Scheduler (every 5 sec)
+        ↓
+Drain 10 TXNs → batch
+        ↓
+Processor → call bank API
+        ↓
+Update DB
  */
 public class PeriodicScheduledDemo {
 

@@ -7,6 +7,7 @@ import java.util.function.Supplier;
 /**
  * SECTION 4 — Correct Implementation: Exponential backoff retry without blocking workers
  *
+ *  approach : fail ==> wait==> retry ==> success/ failure
  * HOW IT WORKS:
  *   - Each attempt calls op.get() which returns a CompletableFuture<T>.
  *   - On success → complete the output future.
@@ -17,6 +18,8 @@ import java.util.function.Supplier;
  *
  * DELAY FORMULA: baseDelay * 2^(attemptNo-1)
  *   Attempt 1 → 0ms (immediate), Attempt 2 → 100ms, Attempt 3 → 200ms, Attempt 4 → 400ms ...
+ *   retry strom  otp : 
+ *   will it give time to ur system to recover. 
  *
  * PRODUCTION ADDITIONS TO CONSIDER:
  *   - Jitter: add random offset to avoid thundering herd on simultaneous retries.
@@ -29,7 +32,7 @@ public class ScheduledRetryCorrect {
     private final ScheduledExecutorService scheduler =
             Executors.newSingleThreadScheduledExecutor(r -> {
                 Thread t = new Thread(r, "retry-scheduler");
-                t.setDaemon(true);
+                t.setDaemon(true);// retry system. 
                 return t;
             });
 
@@ -40,6 +43,10 @@ public class ScheduledRetryCorrect {
      * @param maxAttempts total attempts (including the first)
      * @param baseDelay   delay before the second attempt; doubles each time
      * @return            a future that completes when op succeeds, or fails after all attempts
+     * separation of concerns + state managment + clean async recursion
+     * 
+     * thread1 --calls op.get() ==> whencomplete==> success ==> thread 2 ==> whencomplete==> problem ==> 
+     * will it schedule a next attempt ==> 
      */
     public <T> CompletableFuture<T> retryAsync(
             Supplier<CompletableFuture<T>> op,
