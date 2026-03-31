@@ -14,6 +14,17 @@ import java.util.concurrent.CompletableFuture;
  *
  * FIX: Use thenCompose when your transformation returns a CompletableFuture.
  *      thenCompose "flattens" the result — equivalent to flatMap in streams.
+ *      
+ *      | Method      | Type             | Use Case              | Returns      |
+| ----------- | ---------------- | --------------------- | ------------ |
+| thenApply   | sync transform   | result → new value    | Future<T>    |
+| thenCompose | async chain      | result → async call   | Future<T>    |
+| thenCombine | parallel combine | 2 independent futures | Future<T>    |
+| allOf       | wait many        | N futures             | Future<Void> |
+
+ *      
+ *      
+ *      
  */
 public class NestedFutureDemo {
 
@@ -25,13 +36,16 @@ public class NestedFutureDemo {
         CompletableFuture<Boolean> validF = CompletableFuture.supplyAsync(() -> true);
 
         // ❌ thenApply returns CompletableFuture<CompletableFuture<Integer>>
-        CompletableFuture<CompletableFuture<Integer>> nested =
-                validF.thenApply(valid -> valid
-                        ? fraudScoreAsync()
-                        : CompletableFuture.completedFuture(0));
+//        CompletableFuture<CompletableFuture<Integer>> nested =
+//                validF.thenApply(valid -> valid
+//                        ? fraudScoreAsync()
+//                        : CompletableFuture.completedFuture(0));
+        CompletableFuture<Integer> nested = validF.thenCompose(valid-> valid? fraudScoreAsync()
+        		:CompletableFuture.completedFuture(0));
+        // T-> R boolean-> completableFuture<Integer>
 
         // Two .join() calls needed — brittle, confusing, easy to miss the second
-        int score = nested.join().join();
+        int score = nested.join();
         System.out.println("[NESTED] Score=" + score + "  (needed .join().join() — use thenCompose instead)");
     }
 }

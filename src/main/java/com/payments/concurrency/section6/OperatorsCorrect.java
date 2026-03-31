@@ -22,6 +22,20 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
  *   3. thenCompose: if valid → kick off mlF and velF in PARALLEL on fraudPool
  *   4. thenCombine merges mlScore + velocity into a Risk record
  *   5. thenApply converts Risk → Decision (synchronous)
+ *   
+ *   start 
+ *   KYC + Limit(parallel)
+ *   
+ *   allOf Combine validation results
+ *   combine
+ *   if invalid
+ *   ML + Velocity 
+ *   + thencombine
+ *   + thenapply
+ *   final output.
+ *   
+ *   
+ *   
  */
 public class OperatorsCorrect {
 

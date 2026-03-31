@@ -21,6 +21,13 @@ import java.util.concurrent.*;
  *   - Too large → poor parallelism.
  *   - Start at ~50k–100k per leaf; tune with profiling.
  *
+ *
+ *component: 
+ *Forkjoinpool :  threadPool + scheduler
+ *recursivetask : Task with Result.
+ *recussiveAction : Task without Result
+ *workstealing engine : LoadBalancing between the threads.
+ *
  * CRITICAL: compute() must be CPU-only — no blocking IO, no sleep().
  *           Blocking inside Fork/Join stalls worker threads and reduces parallelism severely.
  */
@@ -52,6 +59,7 @@ public class ForkJoinAggregationCorrect {
 
             // Recursive case: split into two halves
             int mid = start + size / 2;
+            // left : 
             AggTask left  = new AggTask(txns, start, mid);
             AggTask right = new AggTask(txns, mid,   end);
 
@@ -95,10 +103,25 @@ public class ForkJoinAggregationCorrect {
         // Dedicated ForkJoinPool — don't use commonPool() for heavy batch jobs
         // Leave 2 cores for GC and OS to avoid competing with JVM housekeeping
         int parallelism = Math.max(1, Runtime.getRuntime().availableProcessors() - 2);
+        System.out.println("total no of cores :"+Runtime.getRuntime().availableProcessors());
         ForkJoinPool pool = new ForkJoinPool(parallelism);
 
         long start = System.currentTimeMillis();
         Map<String, Long> totals = pool.invoke(new AggTask(txns, 0, txns.size()));
+        /*
+         * step by step : 
+         * 1. root task is created -[0 -> 2M]
+         * 2. compute () start 
+         * 3. size --> thrshold --> split 
+         * 4. recursively splits untill chunk of <=50k
+         * 5. each chunk is processed independently.
+         * 6. work stealing balances threads
+         * 7. result ==> merged 
+         * 8. final map would be returned.
+         * 
+         * threshold = work / no of cores
+         * 
+         * */
         long elapsed = System.currentTimeMillis() - start;
 
         System.out.println("[FORK-JOIN] Merchants=" + totals.size()

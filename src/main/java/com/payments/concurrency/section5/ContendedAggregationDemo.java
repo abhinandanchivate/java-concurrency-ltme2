@@ -17,6 +17,34 @@ import java.util.concurrent.*;
  *
  * FIX: See ForkJoinAggregationCorrect — aggregate locally per task, then merge results
  * up the tree. Zero shared contention during aggregation.
+ * 
+ * classic parallelism anti pattern.  --> looks parallel , but here actually it kills scalability due to contention.
+ * List<String> merchants = new ArrayList<>();
+        for (int i = 0; i < 2_000_000; i++) merchants.add("M" + (i % 1000));
+ multiple threads (parallelstream) ---> try to update the same keys in ConcurrentHashmap
+ ConcurrentHashMap is not lock-free per key.
+ it uses bucket level locking / CAS + retries.
+ when multiple threads update the same key : 
+ millions of update ==> keys are 1000 
+ 1. they collide 
+ 2. they retry 
+ they spin  / block 
+ 
+ merge method : is it atomic in nature ? 
+ internally : 
+ read current value --> compute the new value ---> CAS / lock update --> retry if failed.
+ contention--> many retries will happen ===> will it waste the CPU time / processing work.
+ bottleneck situation : y/N ==> yes.
+ collapse.
+ 
+ --> independent aggregations : each thread works on its own data + its own result container.
+ problem : all threads ==>? writing to the same map ==> collision 
+ all threads ==>? writing to its own map ==> non collision
+ 
+ 
+ 
+ 
+ * 
  */
 public class ContendedAggregationDemo {
 
